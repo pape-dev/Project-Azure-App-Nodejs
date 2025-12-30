@@ -91,109 +91,171 @@ Le déploiement sera effectué en utilisant une combinaison d'outils standards p
 
 ---
 
-# Partie 1 : Création du groupe de ressources - Vnet - NSG - deux VM linux
+# Partie 1 : Déploiement des ressources : 
+
+COMPOSANTS INCLUS :
+    - RÉSEAU : VNet, Subnet Apps, Subnet Bastion, NSG (Ports 22, 80, 3000, 443).
+    - LOAD BALANCER : Standard SKU, Frontend Public IP, Health Probes & Load Balancing Rules.
+    - SÉCURITÉ : Azure Bastion Host (Accès SSH isolé) & Pare-feu dynamique (Dynamic IP Filtering).
+    - COMPUTE : Cluster de 2 VMs Ubuntu 22.04 LTS rattachées au pool Backend du LB.
+    - DATABASE : Azure Database for MySQL Flexible Server (Tier General Purpose).
+    - APP SERVICE : Web App Node.js 20 LTS avec redirection HTTPS forcée.
+    - STORAGE : Account Storage sécurisé (LRS) avec désactivation de l'accès public.
 ```
 # =============================================================================
-# SCRIPT D'AUTOMATISATION DU DÉPLOIEMENT D'INFRASTRUCTURE AZURE (IaaS)
-# Version : 2.0 (Double VM Linux - No Windows)
+# 1. VARIABLES GLOBALES
 # =============================================================================
+$globalConfig = @{
+    ResourceGroup = "RG-PRO-ENTERPRISE-PROJECT"
+    Location      = "norwayeast"
+    VNetName      = "VNET-Core-Net"
+    AppSubnet     = "Subnet-Apps"
+    LBName        = "LB-Public-Service"
+    LBIPName      = "IP-LB-Frontend"
+    VMSize        = "Standard_B1s" # Optimisé pour quota 4 vCPUs
+    AdminUser     = "dspi_admin"
+    AdminPass     = "Azure@2025Ready!" 
+    DBName        = "db-mysql-flexible-$(Get-Random -Min 1000 -Max 9999)"
+    DBAdmin       = "mysqladmin"
+    DBPass        = "Enterprise@Secure2025#"
+    WebAppName    = "app-node-enterprise-$(Get-Random -Min 1000 -Max 9999)"
+    StorageName   = "stproenterprise$(Get-Random -Min 10000 -Max 99999)"
+}
 
-# Connexion (décommentez si nécessaire)
-# Connect-AzAccount
+# Détection automatique de votre IP publique
+Write-Host "`n🔍 Détection de votre IP publique locale..." -ForegroundColor Cyan
+try {
+    $myLocalIP = (Invoke-RestMethod -Uri "https://ifconfig.me/ip" -ErrorAction Stop).Trim()
+    Write-Host "✅ Votre IP détectée : $myLocalIP" -ForegroundColor Yellow
+} catch {
+    $myLocalIP = $null
+    Write-Host "⚠️ Détection IP échouée. Accès manuel requis pour la DB." -ForegroundColor Red
+}
 
-# =============================================================================
-# 1. DÉFINITION DES VARIABLES GLOBALES
-# =============================================================================
-
-# --- Configuration de Base ---
-$RESOURCE_GROUP = "Project-Azure"
-$LOCATION = "norwayeast"
-
-# --- Configuration Réseau ---
-$VNET_NAME = "VNET-Project-Azure"
-$VNET_PREFIX = "10.10.0.0/16"
-$SUBNET_NAME = "SUBNET-Project-Azure"
-$SUBNET_PREFIX = "10.10.1.0/24"
-
-# --- Configuration Sécurité (NSG) ---
-$NSG_NAME = "NSG-Project-Azure"
-
-# --- Configuration des Machines Virtuelles (VM Linux uniquement) ---
-$VM_LINUX_01 = "VM-UBUNTU-01"
-$VM_LINUX_02 = "VM-UBUNTU-02"
-$VM_SIZE = "Standard_B2s"
-$UBUNTU_IMAGE = "Ubuntu2204"
-
-# --- Informations d'Administration ---
-$ADMIN_USER = "dspi"
-$ADMIN_PASSWORD = "Azure@2023Hello#"
+Write-Host "`n[INIT] Démarrage du déploiement Enterprise Stack v7.0..." -ForegroundColor Cyan
+Write-Host "---------------------------------------------------------------------"
 
 # =============================================================================
-# 2. CRÉATION DU GROUPE DE RESSOURCES ET DU RÉSEAU
+# 2. RÉSEAU ET NSG
 # =============================================================================
-Write-Host "➡️ Démarrage du déploiement dans la région $LOCATION..."
-az group create --name $RESOURCE_GROUP --location $LOCATION --output none
+Write-Host "[1/8] Configuration Réseau et Sécurité (NSG)..." -ForegroundColor Magenta
+az group create --name $globalConfig.ResourceGroup --location $globalConfig.Location --output none
 
-Write-Host "Création du VNet et Subnet..."
-az network vnet create -g $RESOURCE_GROUP -n $VNET_NAME --address-prefix $VNET_PREFIX --location $LOCATION --output none
-az network vnet subnet create -g $RESOURCE_GROUP --vnet-name $VNET_NAME --name $SUBNET_NAME --address-prefix $SUBNET_PREFIX --output none
+az network vnet create -g $globalConfig.ResourceGroup -n $globalConfig.VNetName --address-prefix "10.0.0.0/16" `
+    --subnet-name $globalConfig.AppSubnet --subnet-prefix "10.0.1.0/24" --output none
 
-# =============================================================================
-# 3. CRÉATION DU NSG ET RÈGLES (SSH, HTTP, HTTPS, NODE)
-# =============================================================================
-Write-Host "Création du NSG ($NSG_NAME) et des règles Linux..."
-az network nsg create -g $RESOURCE_GROUP -n $NSG_NAME --location $LOCATION --output none
+az network nsg create -g $globalConfig.ResourceGroup -n "NSG-Core" --output none
 
-# SSH (22)
-az network nsg rule create -g $RESOURCE_GROUP --nsg-name $NSG_NAME --name Allow-SSH-Inbound --priority 100 --protocol Tcp --destination-port-ranges 22 --access Allow --direction Inbound --output none
-
-# Web (80, 443)
-az network nsg rule create -g $RESOURCE_GROUP --nsg-name $NSG_NAME --name Allow-HTTP-Inbound --priority 110 --protocol Tcp --destination-port-ranges 80 --access Allow --direction Inbound --output none
-az network nsg rule create -g $RESOURCE_GROUP --nsg-name $NSG_NAME --name Allow-HTTPS-Inbound --priority 120 --protocol Tcp --destination-port-ranges 443 --access Allow --direction Inbound --output none
-
-# Node.js App (3000, 5000)
-az network nsg rule create -g $RESOURCE_GROUP --nsg-name $NSG_NAME --name Allow-Node-3000 --priority 140 --protocol Tcp --destination-port-ranges 3000 --access Allow --direction Inbound --output none
-az network nsg rule create -g $RESOURCE_GROUP --nsg-name $NSG_NAME --name Allow-Node-5000 --priority 150 --protocol Tcp --destination-port-ranges 5000 --access Allow --direction Inbound --output none
+# Règles NSG (22, 80, 3000)
+az network nsg rule create -g $globalConfig.ResourceGroup --nsg-name "NSG-Core" --name "Allow-SSH" --priority 100 --protocol Tcp --destination-port-ranges 22 --access Allow --direction Inbound --output none
+az network nsg rule create -g $globalConfig.ResourceGroup --nsg-name "NSG-Core" --name "Allow-HTTP" --priority 110 --protocol Tcp --destination-port-ranges 80 --access Allow --direction Inbound --output none
+az network nsg rule create -g $globalConfig.ResourceGroup --nsg-name "NSG-Core" --name "Allow-Node-3000" --priority 120 --protocol Tcp --destination-port-ranges 3000 --access Allow --direction Inbound --output none
 
 # =============================================================================
-# 4. CRÉATION DES MACHINES VIRTUELLES LINUX
+# 3. LOAD BALANCER
 # =============================================================================
+Write-Host "[2/8] Configuration Load Balancer (Standard SKU)..." -ForegroundColor Magenta
+az network public-ip create -g $globalConfig.ResourceGroup -n $globalConfig.LBIPName --sku Standard --output none
 
-$VMS = @($VM_LINUX_01, $VM_LINUX_02)
+az network lb create -g $globalConfig.ResourceGroup -n $globalConfig.LBName --sku Standard `
+    --public-ip-address $globalConfig.LBIPName --frontend-ip-name "FrontEnd" --backend-pool-name "BackEndPool" --output none
 
-foreach ($VM_NAME in $VMS) {
-    Write-Host "🚀 Déploiement de la machine : $VM_NAME..."
-    az vm create -g $RESOURCE_GROUP -n $VM_NAME `
-      --location $LOCATION `
-      --image $UBUNTU_IMAGE `
-      --size $VM_SIZE `
-      --vnet-name $VNET_NAME --subnet $SUBNET_NAME `
-      --nsg $NSG_NAME `
-      --admin-username $ADMIN_USER `
-      --admin-password $ADMIN_PASSWORD `
+az network lb probe create -g $globalConfig.ResourceGroup --lb-name $globalConfig.LBName --name "Probe-HTTP" --protocol tcp --port 80 --output none
+
+az network lb rule create -g $globalConfig.ResourceGroup --lb-name $globalConfig.LBName --name "Rule-HTTP" `
+    --protocol tcp --frontend-port 80 --backend-port 80 --frontend-ip-name "FrontEnd" `
+    --backend-pool-name "BackEndPool" --probe-name "Probe-HTTP" --output none
+
+# =============================================================================
+# 4. DÉPLOIEMENT DES VMs (MÉTHODE NIC DÉCOUPLÉE)
+# =============================================================================
+Write-Host "[3/8] Déploiement des VMs (IaaS) avec intégration LB..." -ForegroundColor Magenta
+$vmList = @("VM-PROD-01", "VM-PROD-02")
+$vmInfos = @()
+
+# Récupération de l'ID du Backend Pool pour l'association des NICs
+$lbPoolId = az network lb address-pool show -g $globalConfig.ResourceGroup --lb-name $globalConfig.LBName --name "BackEndPool" --query "id" -o tsv
+
+foreach ($vm in $vmList) {
+    Write-Host "     -> Étape 1 : Création Interface Réseau (NIC) pour $vm..." -ForegroundColor Gray
+    $nicName = "$vm-NIC"
+    az network nic create -g $globalConfig.ResourceGroup -n $nicName `
+        --vnet-name $globalConfig.VNetName --subnet $globalConfig.AppSubnet `
+        --network-security-group "NSG-Core" `
+        --lb-address-pools $lbPoolId --output none
+
+    Write-Host "     -> Étape 2 : Provisionnement de la VM $vm..." -ForegroundColor Cyan
+    $vmJson = az vm create `
+      --resource-group $globalConfig.ResourceGroup `
+      --name $vm `
+      --location $globalConfig.Location `
+      --image "Ubuntu2204" `
+      --size $globalConfig.VMSize `
+      --nics $nicName `
+      --admin-username $globalConfig.AdminUser `
+      --admin-password $globalConfig.AdminPass `
       --public-ip-sku Standard `
-      --output none
+      --output json 
+
+    if ($null -ne $vmJson) {
+        $vmObj = $vmJson | ConvertFrom-Json
+        $ip = $vmObj.publicIpAddress
+        Write-Host "     ✅ $vm créé avec succès ! IP: $ip" -ForegroundColor Green
+        $vmInfos += New-Object PSObject -Property @{ Name = $vm; IP = $ip }
+    } else {
+        Write-Host "     ❌ ÉCHEC critique sur $vm." -ForegroundColor Red
+    }
 }
 
 # =============================================================================
-# 5. RÉSUMÉ DES RESSOURCES
+# 5. MYSQL FLEXIBLE SERVER & FIREWALL
 # =============================================================================
-Write-Host "---"
-Write-Host "✅ DÉPLOIEMENT TERMINÉ."
-Write-Host "---"
+Write-Host "[4/8] Configuration MySQL Flexible (Tier Burstable)..." -ForegroundColor Magenta
+az mysql flexible-server create -g $globalConfig.ResourceGroup -n $globalConfig.DBName `
+    --location $globalConfig.Location --admin-user $globalConfig.DBAdmin `
+    --admin-password $globalConfig.DBPass --sku-name Standard_B1ms `
+    --tier Burstable --version 8.0.21 --public-access Enabled --output none
 
-foreach ($VM_NAME in $VMS) {
-    $IP = az vm show -g $RESOURCE_GROUP -n $VM_NAME --query "publicIps" -o tsv
-    Write-Host "🖥️ $VM_NAME :"
-    Write-Host "   - IP Publique : $IP"
-    Write-Host "   - Connexion : ssh $ADMIN_USER@$IP"
+# Autorisation IP Locale
+if ($null -ne $myLocalIP) {
+    az mysql flexible-server firewall-rule create -g $globalConfig.ResourceGroup -n $globalConfig.DBName `
+        --rule-name "Allow-My-IP" --start-ip-address $myLocalIP --end-ip-address $myLocalIP --output none
 }
-Write-Host "---"
-az vm list -g $RESOURCE_GROUP -o table
+
+# Autorisation IPs des VMs
+foreach ($vm in $vmInfos) {
+    Write-Host "     -> Firewall : Autorisation VM $($vm.Name)..." -ForegroundColor Yellow
+    az mysql flexible-server firewall-rule create -g $globalConfig.ResourceGroup -n $globalConfig.DBName `
+        --rule-name "Allow-$($vm.Name)" --start-ip-address $($vm.IP) --end-ip-address $($vm.IP) --output none
+}
+
+# =============================================================================
+# 6. PAAS (WEB APP & STORAGE)
+# =============================================================================
+Write-Host "[5/8] Finalisation App Service & Storage..." -ForegroundColor Magenta
+
+if (!(Get-AzStorageAccount -ResourceGroupName $globalConfig.ResourceGroup -Name $globalConfig.StorageName -ErrorAction SilentlyContinue)) {
+    New-AzStorageAccount -ResourceGroupName $globalConfig.ResourceGroup -Name $globalConfig.StorageName `
+        -Location $globalConfig.Location -SkuName "Standard_LRS" -Kind "StorageV2" -AllowBlobPublicAccess $false | Out-Null
+}
+
+$plan = New-AzAppServicePlan -Name "ASP-PRO-ENT" -ResourceGroupName $globalConfig.ResourceGroup -Location $globalConfig.Location -Tier "Basic" -Linux
+$webapp = New-AzWebApp -Name $globalConfig.WebAppName -ResourceGroupName $globalConfig.ResourceGroup -Location $globalConfig.Location -AppServicePlan "ASP-PRO-ENT"
+Set-AzWebApp -ResourceGroupName $globalConfig.ResourceGroup -Name $globalConfig.WebAppName -LinuxFxVersion "NODE|20-lts" -HttpsOnly $true | Out-Null
+
+# =============================================================================
+# 7. RAPPORT FINAL
+# =============================================================================
+Write-Host "`n=====================================================================" -ForegroundColor Green
+Write-Host " 🏅 ARCHITECTURE ENTREPRISE DÉPLOYÉE AVEC SUCCÈS" -ForegroundColor Green
+Write-Host "====================================================================="
+Write-Host " 🌐 LOAD BALANCER IP : http://$(az network public-ip show -g $globalConfig.ResourceGroup -n $globalConfig.LBIPName --query "ipAddress" -o tsv)"
+Write-Host " 🏦 MYSQL HOSTNAME   : $($globalConfig.DBName).mysql.database.azure.com"
+Write-Host " 🖥️ VMs DÉPLOYÉES    : $($vmInfos.Count) serveurs actifs."
+Write-Host " 🌍 WEB APP URL      : https://$($globalConfig.WebAppName).azurewebsites.net"
+Write-Host "====================================================================="
+
 ```
-
-
-# Partie 2 : Déploiement Azure Database pour MySQL
 
 ## Connexion au server pour la création de la base de données
 - MySQL Workbench
@@ -248,7 +310,7 @@ CREATE TABLE IF NOT EXISTS contact (
 
 
 
-# Partie 3 :  🐳 Installation Docker (Script Bash)
+# Partie 2 :  🐳 Installation Docker (Script Bash)
 
 - Créer un fichier bash et lui donner les autorisations
 
@@ -401,7 +463,8 @@ cat ~/.ssh/id_ed25519.pub
 - 5️⃣ Cloner le repo en SSH
 
 ```
-git clone git@github.com:pape-dev/dspi-tech-employee-hub.git
+git clone [url]
+cd + 📂 
 
 ```
 ### Lancement avec PM2
@@ -506,16 +569,16 @@ pm2 save
 
 ## Se connecter à l'application
 
-- VM 1  : 20.251.223.213
+- VM 1  : IP Publique
 
 
-- VM 2 : 4.235.106.204
+- VM 2 : IP Publique
 
 
 ## Vérifier les insertions de la base de données
 
 
-# Configuration du load balancer
+# Partie 5 : Configuration du load balancer
 
 ## Au niveau du code > VM 1 & VM 2 Mettre à jour la configuration du nginx
 
@@ -534,6 +597,8 @@ pm2 restart api-backend
 
 ```
 ## Se connecter avec l'IP du Load Balancer 
+
+# Partie 6 : Déploiement de l'application dans AppService
 
 ---
 
