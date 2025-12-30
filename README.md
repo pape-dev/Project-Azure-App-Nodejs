@@ -311,7 +311,7 @@ CREATE TABLE IF NOT EXISTS contact (
 
 # Partie 2 :  🐳 Installation Docker (Script Bash)
 
-- Créer un fichier bash et lui donner les autorisations
+- Créer un fichier bash, lui donner les autorisations et copier ce code dans le fichier bash
 
 ```
 #!/bin/bash
