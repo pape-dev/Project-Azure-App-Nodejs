@@ -258,8 +258,7 @@ Write-Host "====================================================================
 ```
 
 ## Connexion au server pour la création de la base de données
-- MySQL Workbench
-
+### Choix : MySQL Workbench
 
 - Création de la base de données et les table
 ```
