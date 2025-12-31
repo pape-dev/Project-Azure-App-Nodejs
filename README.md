@@ -579,8 +579,13 @@ sudo chmod +x /home/dspi_admin
 
 
 ```
+## Supprimer la configuration par défaut de Nginx
 
-## 3. Activation de la Configuration
+```
+sudo rm /etc/nginx/sites-enabled/default
+```
+
+## 4. Activation de la Configuration
 
 Pour activer la configuration de Nginx et redémarrer le service, suivez ces étapes :
 
