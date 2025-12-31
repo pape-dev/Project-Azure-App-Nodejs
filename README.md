@@ -247,22 +247,38 @@ Write-Host "====================================================================
 ```
 
 ## Connexion au server pour la création de la base de données
-### Choix : MySQL Workbench
 
-- Création de la base de données et les table
+#### 1. Connexion au Serveur MySQL via MySQL Workbench
+1. **Télécharger et installer MySQL Workbench** : Vous pouvez obtenir MySQL Workbench [ici](https://dev.mysql.com/downloads/workbench/).
+2. **Lancer MySQL Workbench** et se connecter à votre serveur MySQL :
+   - **Hôte** : Utilisez l'hostname de votre serveur MySQL, par exemple : `votre-nom-de-serveur.mysql.database.azure.com`
+   - **Nom d'utilisateur** : Utilisez le nom d'utilisateur admin que vous avez défini, par exemple : `mysqladmin`
+   - **Mot de passe** : Utilisez le mot de passe défini pour l'utilisateur admin.
+   
+   Vous devez également vous assurer que votre adresse IP locale est autorisée à se connecter au serveur, sinon vous recevrez une erreur de connexion.
+
+#### 2. Création de la Base de Données et des Tables
+
+Une fois connecté au serveur MySQL, exécutez les commandes suivantes dans MySQL Workbench ou dans un terminal MySQL.
+
+##### 1. Création de la Base de Données
+
 ```
--- 1. Création de la base de données
-
 CREATE DATABASE IF NOT EXISTS appdb
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
+```
 
--- 2. Utiliser la base
+#####  2. Sélection de la Base de Données
 
+```
 USE appdb;
 
--- 3. Création de la table employees
+```
 
+##### 3. Création de la Table employees
+
+```
 CREATE TABLE IF NOT EXISTS employees (
   id VARCHAR(50) NOT NULL,
   firstName VARCHAR(100) NOT NULL,
@@ -279,8 +295,11 @@ CREATE TABLE IF NOT EXISTS employees (
   UNIQUE KEY uniq_email (email)
 );
 
--- 4. Création de la table contact
+```
 
+##### 4. Création de la Table contact
+
+```
 CREATE TABLE IF NOT EXISTS contact (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -292,9 +311,10 @@ CREATE TABLE IF NOT EXISTS contact (
   INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 ```
 
-- Pare-feu de la base de données
+
 
 
 
