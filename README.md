@@ -7,101 +7,96 @@
 ![Node.js](https://img.shields.io/badge/Runtime-Node.js_20_LTS-339933?style=flat&logo=nodedotjs)
 ![Security](https://img.shields.io/badge/Security-Firewall_Active-success?style=flat)
 
-## 📅 Contexte et Objectifs
-
-Ce document détaille la conception architecturale et le plan d'action pour le déploiement des ressources Azure, conformément aux exigences de l'examen E4 (Décembre 2025).
-
-### 🎯 Objectifs de l'Examen
-
-| Exigence | Service Cible | Configuration | Note (Max) |
-| :--- | :--- | :--- | :--- |
-| **1. Hébergement Statique** | VM Windows Server 2025 | Page HTML simple via IIS (Port 80). | 4 |
-| **2. Base de Données** | Azure Database for MySQL | Base de données PaaS (`apdb`) pour l'application. | 4 |
-| **3. Déploiement Applicatif** | VM Ubuntu Server | Application conteneurisée (Node.js/React) via Docker (Ports 3000, 5000). | 4 |
-| **Bonus** | Azure App Service | Déploiement en PaaS de l'application (en parallèle). | 3 |
 
 ---
 
-## I. 🗺️ Architecture Générale
+# Partie 1 : Déploiement des ressources :
 
-L'architecture est une solution hybride IaaS/PaaS, intégrant des composants de mise à l'échelle et de résilience, avec un point d'accès unique via un équilibreur de charge.
+# Déploiement d'une Architecture Azure - Projet Enterprise Stack v7.0
 
+## Description
 
+Ce script PowerShell automatise le déploiement d'une architecture d'infrastructure sur Microsoft Azure, en créant un environnement réseau sécurisé, un load balancer, des machines virtuelles, une base de données MySQL flexible, ainsi qu'un service web pour héberger une application Node.js. Le déploiement est conçu pour une entreprise utilisant une architecture IaaS (Infrastructure as a Service) et PaaS (Platform as a Service).
 
-### 1.1 Composants Clés
+### Composants déployés :
+- **Réseau virtuel (VNet)**
+- **Load Balancer (Standard SKU)**
+- **Machines virtuelles (VMs)**
+- **Base de données MySQL flexible**
+- **Application Web Node.js (PaaS)**
+- **Stockage Azure (Blob Storage)**
 
-* **Azure Load Balancer (Standard)** : Point d'entrée unique.
-* **VNet & Subnet** : Réseau privé pour l'infrastructure IaaS.
-* **Deux VMs** : Windows Server (Hébergement Statique) et Ubuntu (Application Docker).
-* **Azure Database for MySQL** : Base de données gérée PaaS.
-* **Azure Backup** : Solution de continuité dactivité pour les VMs.
+## Prérequis
 
----
+- Azure CLI installé et configuré sur votre machine
+- Compte Azure avec les permissions suffisantes pour créer des ressources
+- PowerShell 7+ pour exécuter le script
+- Connexion à Internet pour accéder à Azure et aux ressources externes
 
-## II. 🌐 Détail des Services Réseau et Sécurité
+## Variables Globales
 
-| Service | Rôle Principal | Nom / SKU | Configuration Spécifique |
-| :--- | :--- | :--- | :--- |
-| **VNet** | Réseau Privé Logique | `VNET-Project-Azure` | Préfixe d'Adresse : `10.10.0.0/16` |
-| **Subnet** | Réseau des serveurs | `SUBNET-Project-Azure` | Préfixe d'Adresse : `10.10.1.0/24` |
-| **Azure Load Balancer** | Distribution du trafic | `LB-Project-Azure` (SKU Standard) | **Pool Backend :** VM Windows et VM Ubuntu. **IP Frontend :** Publique, Statique. |
-| **NSG** | Pare-feu de Sous-réseau / NIC | `NSG-Project-Azure` | **Règles Inbound Essentielles (Source : Load Balancer / IP Admin) :** Port 22 (SSH), Port 3389 (RDP), Port 80 (HTTP), Port 3000 (Backend), Port 5000 (Frontend). |
+Les paramètres de configuration principaux sont définis dans la section **Variables Globales** du script. Voici un aperçu de ceux-ci :
 
----
+- **ResourceGroup** : Le groupe de ressources où toutes les ressources seront créées.
+- **Location** : La région Azure où les ressources seront déployées.
+- **VNetName** : Le nom du réseau virtuel (VNet).
+- **AppSubnet** : Le nom du sous-réseau pour les applications.
+- **LBName** : Le nom du Load Balancer (LB) public.
+- **VMSize** : La taille des machines virtuelles (ex: `Standard_B1s`).
+- **AdminUser** : L'utilisateur administrateur pour les VMs.
+- **DBName** : Nom généré dynamiquement pour la base de données MySQL.
+- **WebAppName** : Nom généré dynamiquement pour l'application web.
+- **StorageName** : Nom généré dynamiquement pour le stockage Azure.
 
-## III. 💻 Détail des Ressources de Calcul (VMs)
+## Déploiement
 
-| Machine Virtuelle | Rôle | Image / SKU | Configuration Applicative |
-| :--- | :--- | :--- | :--- |
-| **VM-WINDOWS-01** | **Hébergement Statique (Exigence 1)** | Windows Server 2025 Datacenter Gen 2 / `Standard_B2s` | Installation de IIS (Web Server Role). Déploiement du fichier `index.html`. |
-| **VM-UBUNTU-01** | **Application Conteneurisée (Exigence 3)** | Ubuntu 22.04 LTS / `Standard_B2s` | Installation de **Docker Engine** via script Bash. Déploiement de l'image Docker (React/Node.js). |
+Le script est divisé en plusieurs étapes pour déployer les différentes ressources Azure. Voici un résumé des étapes de déploiement.
 
-> **Note sur le Load Balancer :** Le trafic HTTP/80 sera dirigé vers le service IIS de la VM Windows, tandis que les ports 3000/5000 seront dirigés vers l'application Docker de la VM Ubuntu, le Load Balancer agissant comme un aiguilleur simple dans ce contexte.
+### 1. **Configuration du Réseau et de la Sécurité (NSG)**
 
----
+- Création d'un groupe de ressources.
+- Déploiement d'un réseau virtuel (VNet) avec un sous-réseau dédié aux applications.
+- Configuration d'un groupe de sécurité réseau (NSG) avec des règles pour permettre l'accès SSH (port 22), HTTP (port 80), et un port spécifique pour Node.js (port 3000).
 
-## IV. 💾 Détail de la Base de Données et de la Résilience
+### 2. **Configuration du Load Balancer**
 
-| Service | Rôle | Configuration | Justification |
-| :--- | :--- | :--- | :--- |
-| **Azure Database for MySQL** | Base de Données PaaS (Exigence 2) | Nom : `apdb`. Tier : Flexible Server (Recommandé). Version : MySQL 8.0. | Solution PaaS recommandée pour réduire l'overhead d'administration (patching, maintenance). |
-| **Sécurité DB** | Connexion sécurisée | Règle de Pare-feu autorisant l'accès depuis le VNet (`10.10.1.0/24`). | Restreindre l'accès à la base de données uniquement aux VMs de l'application. |
-| **Azure Backup** | Sauvegarde des VMs (Résilience) | **Recovery Services Vault :** Création et configuration de la politique de sauvegarde. | Assure la continuité des opérations et la capacité de restauration complète des VMs IaaS. |
-| **Azure App Service** | Bonus PaaS | Déploiement de l'application Node.js/React. | Démonstration d'une solution PaaS (sans gestion d'OS) pour l'application. |
+- Création d'un Load Balancer Standard avec une IP publique.
+- Mise en place d'une sonde de santé pour vérifier l'état des instances en arrière-plan.
+- Création d'une règle de Load Balancer pour diriger le trafic HTTP vers les VMs.
 
----
+### 3. **Déploiement des Machines Virtuelles (VMs)**
 
-## V. ⚙️ Outils de Déploiement
+- Déploiement de plusieurs machines virtuelles avec une interface réseau (NIC) dédiée et connectée au Load Balancer.
+- Configuration des VMs avec Ubuntu 22.04, taille de machine `Standard_B1s`, et un mot de passe administrateur.
 
-Le déploiement sera effectué en utilisant une combinaison d'outils standards pour une approche professionnelle :
+### 4. **Déploiement de la Base de Données MySQL Flexible**
 
-1.  **Azure CLI (Interface en ligne de commande) :** Utilisé via des **scripts PowerShell** pour l'automatisation du déploiement de l'infrastructure (VNet, NSG, VMs, LB, DB).
-2.  **Scripts Bash :** Utilisés via des extensions de VM ou après SSH pour la configuration spécifique de la VM Ubuntu (installation de Docker).
-3.  **Commandes RDP/SSH :** Utilisées pour les configurations finales (IIS sur Windows, commande `docker run` sur Ubuntu).
+- Création d'un serveur MySQL flexible avec le niveau "Burstable".
+- Autorisation de l'accès depuis l'IP locale et les IP des VMs créées.
 
----
+### 5. **Déploiement de l'Application Web et du Stockage**
 
-## VI. ✅ Prochaines Étapes
+- Vérification de l'existence d'un compte de stockage et création si nécessaire.
+- Déploiement d'une application Node.js sur Azure App Service (PaaS).
+- Déploiement d'un plan App Service et configuration de l'application web pour utiliser la version LTS de Node.js.
+  
+### 6. **Finalisation et Rapport**
 
-1.  **Finalisation des Scripts d'Infrastructure :** Intégration complète des commandes Azure CLI pour créer toutes les ressources listées.
-2.  **Script de Nettoyage :** Création d'un script (`cleanup.sh` ou `.ps1`) pour supprimer le groupe de ressources afin d'éviter les frais.
-3.  **Tests de Validation :** Vérification de l'accès à la page HTML (Port 80) et à l'application Node.js (Ports 3000/5000) via l'IP Publique du Load Balancer.
+À la fin du déploiement, un rapport détaillé est affiché avec les informations suivantes :
+- L'IP publique du Load Balancer.
+- Le nom d'hôte de la base de données MySQL.
+- Le nombre de VMs déployées.
+- L'URL de l'application web déployée.
 
+## Exécution du Script
 
+1. Clonez ce repository sur votre machine locale.
+2. Ouvrez PowerShell et naviguez jusqu'au répertoire contenant le script.
+3. Exécutez le script avec la commande suivante :
 
----
-
-# Partie 1 : Déploiement des ressources : 
-
-COMPOSANTS INCLUS :
-    - RÉSEAU : VNet, Subnet Apps, Subnet Bastion, NSG (Ports 22, 80, 3000, 443).
-    - LOAD BALANCER : Standard SKU, Frontend Public IP, Health Probes & Load Balancing Rules.
-    - SÉCURITÉ : Azure Bastion Host (Accès SSH isolé) & Pare-feu dynamique (Dynamic IP Filtering).
-    - COMPUTE : Cluster de 2 VMs Ubuntu 22.04 LTS rattachées au pool Backend du LB.
-    - DATABASE : Azure Database for MySQL Flexible Server (Tier General Purpose).
-    - APP SERVICE : Web App Node.js 20 LTS avec redirection HTTPS forcée.
-    - STORAGE : Account Storage sécurisé (LRS) avec désactivation de l'accès public.
+## Voici le script : 
 ```
+
 # =============================================================================
 # 1. VARIABLES GLOBALES
 # =============================================================================
