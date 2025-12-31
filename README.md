@@ -12,8 +12,6 @@
 
 # Partie 1 : Déploiement des ressources :
 
-# Déploiement d'une Architecture Azure - Projet Enterprise Stack v7.0
-
 ## Description
 
 Ce script PowerShell automatise le déploiement d'une architecture d'infrastructure sur Microsoft Azure, en créant un environnement réseau sécurisé, un load balancer, des machines virtuelles, une base de données MySQL flexible, ainsi qu'un service web pour héberger une application Node.js. Le déploiement est conçu pour une entreprise utilisant une architecture IaaS (Infrastructure as a Service) et PaaS (Platform as a Service).
@@ -246,7 +244,7 @@ Write-Host "====================================================================
 
 ```
 
-## Connexion au server pour la création de la base de données
+# Partie 2 : Connexion au server pour la création de la base de données
 
 #### 1. Connexion au Serveur MySQL via MySQL Workbench
 1. **Télécharger et installer MySQL Workbench** : Vous pouvez obtenir MySQL Workbench [ici](https://dev.mysql.com/downloads/workbench/).
@@ -314,13 +312,24 @@ CREATE TABLE IF NOT EXISTS contact (
 
 ```
 
+# Partie 3 :  🐳 Installation Docker (Script Bash)
 
+## Étapes pour installer Docker en utilisant un script Bash
 
+Suivez les étapes ci-dessous pour créer un script d'installation Docker et l'exécuter sur une machine Ubuntu.
 
+### 1. Créez un fichier Bash pour l'installation de Docker
 
-# Partie 2 :  🐳 Installation Docker (Script Bash)
+Créez un fichier Bash, par exemple `install_docker.sh`, dans lequel vous allez copier le code du script.
 
-- Créer un fichier bash, lui donner les autorisations et copier ce code dans le fichier bash
+```
+nano install_docker.sh
+
+```
+
+### 2. Copiez le code du script
+
+Copiez le code du script d'installation Docker que vous avez reçu dans le fichier install_docker.sh. voici le cde : 
 
 ```
 #!/bin/bash
@@ -331,9 +340,6 @@ CREATE TABLE IF NOT EXISTS contact (
 # Ce script exécute les étapes officielles pour désinstaller les anciennes versions,
 # configurer le dépôt Docker et installer les dernières versions des paquets.
 #
-# Auteur : [Votre Nom/Équipe]
-# Date : Décembre 2025
-# Version : 1.2 (Basé sur les commandes Docker CLI officielles)
 # =============================================================================
 
 # --- 1. CONFIGURATION ET FONCTIONS ---
@@ -354,7 +360,7 @@ function log_action {
     echo "➡️ $1"
 }
 
-# Vérification des privilèges
+# Vérification des privilèges (script doit être exécuté en tant que root)
 if [ "$EUID" -ne 0 ]; then
     die "Ce script doit être exécuté avec des privilèges root (sudo)."
 fi
@@ -364,24 +370,26 @@ log_action "Démarrage du processus d'installation/mise à jour de Docker..."
 # --- 2. DÉSINSTALLATION DES VERSIONS INCOMPATIBLES/OBSOLÈTES ---
 log_action "Désinstallation des paquets Docker/Conteneur non officiels ou anciens..."
 
-# Commande optimisée pour la désinstallation. Elle ne s'arrête pas s'il n'y a rien à supprimer.
+# Commande optimisée pour la désinstallation des paquets existants
 dpkg --get-selections | grep -E 'docker.io|docker-compose|docker-compose-v2|docker-doc|podman-docker|containerd|runc' | awk '{print $1}' | xargs -r apt remove -y >> "$LOG_FILE" 2>&1
 
-# Commande pour supprimer les configurations résiduelles (facultatif mais recommandé)
+# Optionnel : suppression des fichiers de configuration résiduels
 # apt purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >> "$LOG_FILE" 2>&1
 
+log_action "Désinstallation terminée."
+
 # --- 3. PRÉPARATION ET CONFIGURATION DU DÉPÔT DOCKER ---
-log_action "Installation des dépendances pour la gestion des dépôts (ca-certificates, curl)..."
+log_action "Installation des dépendances nécessaires pour gérer les dépôts (ca-certificates, curl)..."
 apt update >> "$LOG_FILE" 2>&1 || die "Échec de la mise à jour des index APT."
 apt install -y ca-certificates curl >> "$LOG_FILE" 2>&1 || die "Échec de l'installation des prérequis."
 
-log_action "Configuration du répertoire GPG et téléchargement de la clé officielle Docker..."
+log_action "Téléchargement de la clé GPG officielle de Docker..."
 install -m 0755 -d /etc/apt/keyrings >> "$LOG_FILE" 2>&1
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc >> "$LOG_FILE" 2>&1 || die "Échec du téléchargement de la clé GPG Docker."
 chmod a+r /etc/apt/keyrings/docker.asc
 
-log_action "Ajout du dépôt Docker Stable aux sources APT (/etc/apt/sources.list.d/docker.sources)..."
-# Utilisation de 'tee' pour écrire dans le fichier avec sudo
+log_action "Ajout du dépôt Docker Stable aux sources APT..."
+# Utilisation de 'tee' pour écrire dans le fichier avec les privilèges sudo
 tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
 Types: deb
 URIs: https://download.docker.com/linux/ubuntu
@@ -390,12 +398,16 @@ Components: stable
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 
+log_action "Le dépôt Docker a été ajouté avec succès."
+
 # --- 4. INSTALLATION DE DOCKER ENGINE ---
-log_action "Mise à jour des index APT après ajout du dépôt..."
+log_action "Mise à jour des index APT après ajout du dépôt Docker..."
 apt update >> "$LOG_FILE" 2>&1 || die "Échec de la mise à jour des index après ajout du dépôt Docker."
 
-log_action "Installation des paquets principaux Docker (docker-ce, cli, buildx, compose)..."
+log_action "Installation des paquets Docker (docker-ce, cli, buildx, compose)..."
 apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin >> "$LOG_FILE" 2>&1 || die "Échec de l'installation des paquets Docker."
+
+log_action "Docker Engine et ses outils ont été installés avec succès."
 
 # --- 5. GESTION DU SERVICE ET VÉRIFICATION ---
 log_action "Vérification et démarrage du service Docker..."
@@ -408,17 +420,15 @@ else
     die "Le service Docker n'a pas pu démarrer. Vérifiez les dépendances."
 fi
 
-# Affichage du statut
+log_action "Affichage du statut de Docker..."
 systemctl status docker | head -n 3 | tee -a "$LOG_FILE"
 
 # --- 6. CONFIGURATION POST-INSTALLATION (Docker sans sudo) ---
 log_action "Ajout de l'utilisateur '$DOCKER_USER' au groupe 'docker'..."
-
-# Ajout au groupe 'docker' (l'utilisateur doit se déconnecter/reconnecter)
 usermod -aG docker "$DOCKER_USER" >> "$LOG_FILE" 2>&1
 
-log_action "Exécution du test 'hello-world' (cela peut échouer si l'utilisateur n'est pas root/pas encore reconnecté)..."
-docker run hello-world >> "$LOG_FILE" 2>&1 || log_action "ATTENTION: Le test 'hello-world' a échoué pour l'utilisateur. Le nouvel utilisateur du groupe 'docker' doit se déconnecter et se reconnecter."
+log_action "Test de la commande Docker (hello-world)..."
+docker run hello-world >> "$LOG_FILE" 2>&1 || log_action "ATTENTION: Le test 'hello-world' a échoué. L'utilisateur doit se déconnecter et se reconnecter pour prendre en compte le groupe Docker."
 
 # --- 7. FINALISATION ---
 echo ""
@@ -433,9 +443,26 @@ echo "   1. VOUS DÉCONNECTER (logout)."
 echo "   2. VOUS RECONNECTER à votre session."
 echo ""
 echo "Fichier de journalisation : $LOG_FILE"
+echo "Vous pouvez consulter le fichier de log pour tout problème survenu pendant l'installation."
 
 exit 0
+
 ```
+
+### 3. Donnez les autorisations d'exécution au script
+
+```
+sudo chmod +x install_docker.sh
+
+```
+
+### 4. Exécutez le script avec les privilèges root
+
+```
+sudo ./install_docker.sh
+
+```
+
 # Partie 4 : 📦 Dépendances applicatives dans chaque VM
 ```
 sudo apt update && sudo apt upgrade -y
