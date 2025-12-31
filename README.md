@@ -501,7 +501,26 @@ Lors du clonage via HTTPS, vous serez invité à entrer vos identifiants GitHub 
 
 - **Nom d'utilisateur** : Votre nom d'utilisateur GitHub.
 - **Mot de passe** : Utilisez un **token d'accès personnel (PAT)** comme mot de passe.  
-  Si vous n'avez pas encore généré de PAT, suivez [ces instructions](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token).
+
+ ## Configurer les variables d'environnement
+
+Créez un fichier `.env` à la racine du projet :
+
+```
+# Configuration de la base de données
+DB_HOST="Server database for MySQL"
+DB_PORT=3306
+DB_NAME=appdb
+DB_USER=votre_utilisateur
+DB_PASSWORD=votre_mot_de_passe
+
+# Configuration du serveur API
+PORT=3000
+
+# Configuration du frontend (optionnel)
+VITE_API_URL=http://localhost:3000
+
+```
 
 ### 📦 Installer les dépendances
 
@@ -653,21 +672,7 @@ pm2 restart api-backend
 
 ---
 
-
-## ✅ Conclusion
-Ce projet valide les compétences suivantes :
-- Provisionnement IaaS via scripts automatisés.
-- Gestion de services PaaS (MySQL Managé).
-- Conteneurisation et Reverse Proxy (Docker / Nginx).
-- Haute Disponibilité (Standard Load Balancer).
-- Déployer & héberger des applications 
-- Sécurisation (Groupes de sécurité et SSH).
-
-
-
----
-
-# Application Web : DSPI-TECH Employee Hub
+# Explications du code de l'application
 
 Application web complète de gestion des employés et des contacts pour DSPI-TECH. Cette application permet de gérer les informations des collaborateurs, d'ajouter de nouveaux employés, de consulter les données et d'exporter les informations au format CSV.
 
@@ -758,70 +763,8 @@ Avant de commencer, assurez-vous d'avoir installé :
 - **MySQL** (version 8.0 ou supérieure) - [Télécharger MySQL](https://dev.mysql.com/downloads/mysql/)
 - **Git** - [Télécharger Git](https://git-scm.com/)
 
-## 🚀 Installation
 
-### 1. Cloner le repository
-
-```bash
-git clone <URL_DU_REPOSITORY>
-cd dspi-tech-employee-hub
-```
-
-### 2. Installer les dépendances
-
-```bash
-npm install
-```
-
-### 3. Configurer la base de données
-
-Créez une base de données MySQL et exécutez le script SQL :
-
-```bash
-mysql -u root -p < Docs_Config/bd.sql
-```
-
-Ou connectez-vous à MySQL et exécutez le contenu du fichier `Docs_Config/bd.sql`.
-
-### 4. Configurer les variables d'environnement
-
-Créez un fichier `.env` à la racine du projet :
-
-```env
-# Configuration de la base de données
-DB_HOST="Server database for MySQL"
-DB_PORT=3306
-DB_NAME=appdb
-DB_USER=votre_utilisateur
-DB_PASSWORD=votre_mot_de_passe
-
-# Configuration du serveur API
-PORT=3000
-
-# Configuration du frontend (optionnel)
-VITE_API_URL=http://localhost:3000
-```
-
-### 5. Démarrer l'application
-
-#### Option 1 : Démarrer frontend et backend ensemble
-```bash
-npm run dev:full
-```
-
-#### Option 2 : Démarrer séparément
-
-Terminal 1 - Frontend :
-```bash
-npm run dev
-```
-
-Terminal 2 - Backend :
-```bash
-npm run server
-```
-
-L'application sera accessible sur :
+L'application est accessible sur :
 - **Frontend** : http://localhost:8080
 - **Backend API** : http://localhost:3000
 
@@ -1045,15 +988,6 @@ POST /api/contact
 | `message` | TEXT | Message |
 | `created_at` | TIMESTAMP | Date de création (auto) |
 
-### Script SQL
-
-Le script de création de la base de données se trouve dans `Docs_Config/bd.sql`.
-
-Pour créer la base de données :
-
-```bash
-mysql -u root -p < Docs_Config/bd.sql
-```
 
 ## 💻 Utilisation
 
@@ -1098,16 +1032,7 @@ L'application propose 4 pages principales :
 | `npm run preview` | Prévisualise la build de production |
 | `npm run lint` | Exécute ESLint pour vérifier le code |
 
-## 🚢 Déploiement
 
-### Build de production
-
-```bash
-npm run build
-
-```
-
-Les fichiers compilés seront dans le dossier `dist/`.
 
 ### Déploiement du backend
 
@@ -1118,22 +1043,7 @@ Le serveur Express peut être déployé sur :
 - **VPS** (avec PM2)
 - **Azure App Service**
 
-### Variables d'environnement en production
 
-Assurez-vous de configurer toutes les variables d'environnement nécessaires sur votre plateforme de déploiement.
-
-### Exemple avec PM2
-
-```bash
-# Installer PM2
-npm install -g pm2
-
-# Démarrer le serveur
-pm2 start server/index.js --name "dspi-api"
-
-# Sauvegarder la configuration
-pm2 save
-```
 
 ## 🤝 Contribution
 
