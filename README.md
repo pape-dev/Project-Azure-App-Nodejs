@@ -506,8 +506,6 @@ DB_PASSWORD=votre_mot_de_passe
 # Configuration du serveur API
 PORT=3000
 
-# Configuration du frontend (optionnel)
-VITE_API_URL=http://localhost:3000
 
 ```
 
@@ -528,7 +526,6 @@ npm run build
 ### 🚀 Lancer l'application avec PM2
 
   ```
-cd + 📂 du projet
 pm2 start server/index.js --name "api-backend"
 pm2 save
   ```
@@ -547,25 +544,24 @@ Ajoutez ensuite le code suivant dans le fichier de configuration de Nginx :
 ```
 server {
     listen 80;
-    server_name _;  # Remplacez par votre IP Azure
+    server_name 4.219.12.45;  # Remplacez par votre IP Azure ou nom de domaine (ex. example.com)
 
     # Serveur de fichiers statiques (Frontend)
     location / {
-        root /home/dspi_admin/Project-Azure-App-Nodejs/dist;
+         root /home/dspi_admin/Project-Azure-App-Nodejs/dist;  # Chemin vers les fichiers du frontend (buildé avec un framework comme React ou Vue)
         index index.html;
-        try_files $uri $uri/ /index.html;
+        try_files $uri $uri/ /index.html;  # Utilisé pour le routage côté client dans les applications SPA (Single Page Application)
     }
 
     # Proxy vers le Backend (Express)
     location /api {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3000;  # L'API Express tourne localement sur le port 3000
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
     }
 }
+
 
 ```
 ## 2. Gestion des Permissions
@@ -619,13 +615,6 @@ pm2 save
 
 ```
 
-## 5. Statut de PM2
-
-Voici l'état de PM2 sur chaque machine virtuelle :
-
-- **VM 1** : [Détails du statut ici]
-- **VM 2** : [Détails du statut ici]
-
 
 ## Se connecter à l'application
 
@@ -640,23 +629,65 @@ Voici l'état de PM2 sur chaque machine virtuelle :
 
 # Partie 5 : Configuration du load balancer
 
-## Au niveau du code > VM 1 & VM 2 Mettre à jour la configuration du nginx
+Dans cette partie on souhaite accéder à l'pplication via l'IP publique du Load Balancer.
+
+
+## 1. Mettre à jour la configuration de Nginx
+
+1. Ouvrez le fichier de configuration Nginx pour votre application :
 
 ```
 sudo nano /etc/nginx/sites-available/mon_app
+```
+## Remplacez la directive server_name par _ pour utiliser un serveur par défaut :
 
 ```
-Les IP "Server_Name" ont été remplacés par "_" : 
+server {
+    listen 80;
+    server_name _;  # Remplacez par votre IP Azure ou nom de domaine (ex. example.com)
+
+    # Serveur de fichiers statiques (Frontend)
+    location / {
+         root /home/dspi_admin/Project-Azure-App-Nodejs/dist;  # Chemin vers les fichiers du frontend (buildé avec un framework comme React ou Vue)
+        index index.html;
+        try_files $uri $uri/ /index.html;  # Utilisé pour le routage côté client dans les applications SPA (Single Page Application)
+    }
+
+    # Proxy vers le Backend (Express)
+    location /api {
+        proxy_pass http://127.0.0.1:3000;  # L'API Express tourne localement sur le port 3000
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+    }
+}
+```
+
+## Sauvegardez et fermez le fichier 
+
+## 2. Builder le projet Node.js
+
+Dans le répertoire racine de votre projet, exécutez :
 
 ```
 npm run build
+```
 
+## 3. Redémarrer Nginx et le backend Node.js
+
+```
 sudo systemctl restart nginx
 
 pm2 restart api-backend
 
 ```
-## Se connecter avec l'IP du Load Balancer 
+
+## 4. Vérifier le déploiement
+
+Ouvrez votre navigateur et entrez l'adresse IP du **Load Balancer**.
+
+Vous devriez voir votre application frontend servie par **Nginx** et les appels API fonctionnant via le **backend Node.js**.
+
 
 # Partie 6 : Déploiement de l'application dans AppService
 
