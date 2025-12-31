@@ -324,7 +324,6 @@ Créez un fichier Bash, par exemple `install_docker.sh`, dans lequel vous allez 
 
 ```
 nano install_docker.sh
-
 ```
 
 ### 2. Copiez le code du script
@@ -453,14 +452,12 @@ exit 0
 
 ```
 sudo chmod +x install_docker.sh
-
 ```
 
 ### 4. Exécutez le script avec les privilèges root
 
 ```
 sudo ./install_docker.sh
-
 ```
 
 # Partie 4 : 📦 Dépendances applicatives dans chaque VM
