@@ -90,7 +90,7 @@ Le script est divisé en plusieurs étapes pour déployer les différentes resso
 ```
 
 # =============================================================================
-# 1. VARIABLES GLOBALES
+# 1. VARIABLES GLOBALES ET CONFIGURATION
 # =============================================================================
 $globalConfig = @{
     ResourceGroup = "RG-PRO-ENTERPRISE-PROJECT"
@@ -99,7 +99,7 @@ $globalConfig = @{
     AppSubnet     = "Subnet-Apps"
     LBName        = "LB-Public-Service"
     LBIPName      = "IP-LB-Frontend"
-    VMSize        = "Standard_B1s" # Optimisé pour quota 4 vCPUs
+    VMSize        = "Standard_B1s" 
     AdminUser     = "dspi_admin"
     AdminPass     = "Azure@2025Ready!" 
     DBName        = "db-mysql-flexible-$(Get-Random -Min 1000 -Max 9999)"
@@ -109,23 +109,16 @@ $globalConfig = @{
     StorageName   = "stproenterprise$(Get-Random -Min 10000 -Max 99999)"
 }
 
-# Détection automatique de votre IP publique
-Write-Host "`n🔍 Détection de votre IP publique locale..." -ForegroundColor Cyan
-try {
-    $myLocalIP = (Invoke-RestMethod -Uri "https://ifconfig.me/ip" -ErrorAction Stop).Trim()
-    Write-Host "✅ Votre IP détectée : $myLocalIP" -ForegroundColor Yellow
-} catch {
-    $myLocalIP = $null
-    Write-Host "⚠️ Détection IP échouée. Accès manuel requis pour la DB." -ForegroundColor Red
-}
+# Détection de l'IP publique locale pour le Firewall
+$myLocalIP = (Invoke-RestMethod -Uri "https://ifconfig.me/ip").Trim()
 
-Write-Host "`n[INIT] Démarrage du déploiement Enterprise Stack v7.0..." -ForegroundColor Cyan
+Write-Host "`n[INIT] Démarrage du déploiement Enterprise Stack v8.0 (Norway East)..." -ForegroundColor Cyan
 Write-Host "---------------------------------------------------------------------"
 
 # =============================================================================
-# 2. RÉSEAU ET NSG
+# 2. RÉSEAU ET SÉCURITÉ (NSG)
 # =============================================================================
-Write-Host "[1/8] Configuration Réseau et Sécurité (NSG)..." -ForegroundColor Magenta
+Write-Host "[1/8] Configuration Réseau et NSG..." -ForegroundColor Magenta
 az group create --name $globalConfig.ResourceGroup --location $globalConfig.Location --output none
 
 az network vnet create -g $globalConfig.ResourceGroup -n $globalConfig.VNetName --address-prefix "10.0.0.0/16" `
@@ -133,115 +126,111 @@ az network vnet create -g $globalConfig.ResourceGroup -n $globalConfig.VNetName 
 
 az network nsg create -g $globalConfig.ResourceGroup -n "NSG-Core" --output none
 
-# Règles NSG (22, 80, 3000)
+# Autorisation SSH et HTTP
 az network nsg rule create -g $globalConfig.ResourceGroup --nsg-name "NSG-Core" --name "Allow-SSH" --priority 100 --protocol Tcp --destination-port-ranges 22 --access Allow --direction Inbound --output none
 az network nsg rule create -g $globalConfig.ResourceGroup --nsg-name "NSG-Core" --name "Allow-HTTP" --priority 110 --protocol Tcp --destination-port-ranges 80 --access Allow --direction Inbound --output none
-az network nsg rule create -g $globalConfig.ResourceGroup --nsg-name "NSG-Core" --name "Allow-Node-3000" --priority 120 --protocol Tcp --destination-port-ranges 3000 --access Allow --direction Inbound --output none
 
 # =============================================================================
 # 3. LOAD BALANCER
 # =============================================================================
-Write-Host "[2/8] Configuration Load Balancer (Standard SKU)..." -ForegroundColor Magenta
+Write-Host "[2/8] Configuration Load Balancer (SKU Standard)..." -ForegroundColor Magenta
 az network public-ip create -g $globalConfig.ResourceGroup -n $globalConfig.LBIPName --sku Standard --output none
 
 az network lb create -g $globalConfig.ResourceGroup -n $globalConfig.LBName --sku Standard `
     --public-ip-address $globalConfig.LBIPName --frontend-ip-name "FrontEnd" --backend-pool-name "BackEndPool" --output none
 
-az network lb probe create -g $globalConfig.ResourceGroup --lb-name $globalConfig.LBName --name "Probe-HTTP" --protocol tcp --port 80 --output none
-
-az network lb rule create -g $globalConfig.ResourceGroup --lb-name $globalConfig.LBName --name "Rule-HTTP" `
-    --protocol tcp --frontend-port 80 --backend-port 80 --frontend-ip-name "FrontEnd" `
-    --backend-pool-name "BackEndPool" --probe-name "Probe-HTTP" --output none
-
 # =============================================================================
-# 4. DÉPLOIEMENT DES VMs (MÉTHODE NIC DÉCOUPLÉE)
+# 4. DÉPLOIEMENT DES VMS (AVEC IP PUBLIQUE POUR CHAQUE VM)
 # =============================================================================
-Write-Host "[3/8] Déploiement des VMs (IaaS) avec intégration LB..." -ForegroundColor Magenta
+Write-Host "[3/8] Déploiement des VMs avec IPs Publiques..." -ForegroundColor Magenta
 $vmList = @("VM-PROD-01", "VM-PROD-02")
 $vmInfos = @()
-
-# Récupération de l'ID du Backend Pool pour l'association des NICs
 $lbPoolId = az network lb address-pool show -g $globalConfig.ResourceGroup --lb-name $globalConfig.LBName --name "BackEndPool" --query "id" -o tsv
 
 foreach ($vm in $vmList) {
-    Write-Host "     -> Étape 1 : Création Interface Réseau (NIC) pour $vm..." -ForegroundColor Gray
+    Write-Host "     -> Création IP Publique et NIC pour $vm..." -ForegroundColor Gray
+    $publicIpName = "$vm-IP-Public"
+    az network public-ip create -g $globalConfig.ResourceGroup -n $publicIpName --sku Standard --output none
+
     $nicName = "$vm-NIC"
-    az network nic create -g $globalConfig.ResourceGroup -n $nicName `
-        --vnet-name $globalConfig.VNetName --subnet $globalConfig.AppSubnet `
-        --network-security-group "NSG-Core" `
-        --lb-address-pools $lbPoolId --output none
+    az network nic create -g $globalConfig.ResourceGroup -n $nicName --vnet-name $globalConfig.VNetName --subnet $globalConfig.AppSubnet `
+        --network-security-group "NSG-Core" --lb-address-pools $lbPoolId --public-ip-address $publicIpName --output none
 
-    Write-Host "     -> Étape 2 : Provisionnement de la VM $vm..." -ForegroundColor Cyan
-    $vmJson = az vm create `
-      --resource-group $globalConfig.ResourceGroup `
-      --name $vm `
-      --location $globalConfig.Location `
-      --image "Ubuntu2204" `
-      --size $globalConfig.VMSize `
-      --nics $nicName `
-      --admin-username $globalConfig.AdminUser `
-      --admin-password $globalConfig.AdminPass `
-      --public-ip-sku Standard `
-      --output json 
+    Write-Host "     -> Provisionnement de $vm..." -ForegroundColor Cyan
+    az vm create -g $globalConfig.ResourceGroup -n $vm --image "Ubuntu2204" --size $globalConfig.VMSize `
+        --nics $nicName --admin-username $globalConfig.AdminUser --admin-password $globalConfig.AdminPass --output none
 
-    if ($null -ne $vmJson) {
-        $vmObj = $vmJson | ConvertFrom-Json
-        $ip = $vmObj.publicIpAddress
+    # Récupération de l'IP publique pour le rapport et le firewall
+    $ip = az network public-ip show -g $globalConfig.ResourceGroup -n $publicIpName --query "ipAddress" -o tsv
+    if ($ip) {
         Write-Host "     ✅ $vm créé avec succès ! IP: $ip" -ForegroundColor Green
-        $vmInfos += New-Object PSObject -Property @{ Name = $vm; IP = $ip }
-    } else {
-        Write-Host "     ❌ ÉCHEC critique sur $vm." -ForegroundColor Red
+        $vmInfos += [PSCustomObject]@{ Name = $vm; IP = $ip }
     }
 }
 
 # =============================================================================
-# 5. MYSQL FLEXIBLE SERVER & FIREWALL
+# 5. MYSQL FLEXIBLE SERVER ET RÈGLES FIREWALL (SERVICES AZURE INCLUS)
 # =============================================================================
-Write-Host "[4/8] Configuration MySQL Flexible (Tier Burstable)..." -ForegroundColor Magenta
+Write-Host "[4/8] Configuration MySQL Flexible..." -ForegroundColor Magenta
 az mysql flexible-server create -g $globalConfig.ResourceGroup -n $globalConfig.DBName `
-    --location $globalConfig.Location --admin-user $globalConfig.DBAdmin `
-    --admin-password $globalConfig.DBPass --sku-name Standard_B1ms `
-    --tier Burstable --version 8.0.21 --public-access Enabled --output none
+    --location $globalConfig.Location --admin-user $globalConfig.DBAdmin --admin-password $globalConfig.DBPass `
+    --sku-name Standard_B1ms --tier Burstable --public-access Enabled --output none
 
-# Autorisation IP Locale
-if ($null -ne $myLocalIP) {
-    az mysql flexible-server firewall-rule create -g $globalConfig.ResourceGroup -n $globalConfig.DBName `
-        --rule-name "Allow-My-IP" --start-ip-address $myLocalIP --end-ip-address $myLocalIP --output none
-}
+Write-Host "     -> Configuration des accès Firewall..." -ForegroundColor Gray
+# Règle Services Azure (indispensable pour Web App)
+az mysql flexible-server firewall-rule create -g $globalConfig.ResourceGroup -n $globalConfig.DBName `
+    --rule-name "AllowAzureServices" --start-ip-address "0.0.0.0" --end-ip-address "0.0.0.0" --output none
 
-# Autorisation IPs des VMs
+# Autorisation IP locale
+az mysql flexible-server firewall-rule create -g $globalConfig.ResourceGroup -n $globalConfig.DBName `
+    --rule-name "AllowLocalIP" --start-ip-address $myLocalIP --end-ip-address $myLocalIP --output none
+
+# Autorisation IPs Publiques des VMs
 foreach ($vm in $vmInfos) {
-    Write-Host "     -> Firewall : Autorisation VM $($vm.Name)..." -ForegroundColor Yellow
     az mysql flexible-server firewall-rule create -g $globalConfig.ResourceGroup -n $globalConfig.DBName `
-        --rule-name "Allow-$($vm.Name)" --start-ip-address $($vm.IP) --end-ip-address $($vm.IP) --output none
+        --rule-name "Allow-$($vm.Name)" --start-ip-address "$($vm.IP)" --end-ip-address "$($vm.IP)" --output none
 }
 
 # =============================================================================
-# 6. PAAS (WEB APP & STORAGE)
+# 6. AZURE STORAGE PRO (INTEGRATION)
 # =============================================================================
-Write-Host "[5/8] Finalisation App Service & Storage..." -ForegroundColor Magenta
+Write-Host "[5/8] Déploiement Azure Storage Pro..." -ForegroundColor Magenta
+$storageAccount = New-AzStorageAccount -ResourceGroupName $globalConfig.ResourceGroup `
+    -Name $globalConfig.StorageName `
+    -Location $globalConfig.Location `
+    -SkuName Standard_LRS -Kind StorageV2 -AllowBlobPublicAccess $false `
+    -MinimumTlsVersion TLS1_2
 
-if (!(Get-AzStorageAccount -ResourceGroupName $globalConfig.ResourceGroup -Name $globalConfig.StorageName -ErrorAction SilentlyContinue)) {
-    New-AzStorageAccount -ResourceGroupName $globalConfig.ResourceGroup -Name $globalConfig.StorageName `
-        -Location $globalConfig.Location -SkuName "Standard_LRS" -Kind "StorageV2" -AllowBlobPublicAccess $false | Out-Null
-}
+Write-Host "--- Pause de 45s pour la propagation DNS (Essentiel) ---" -ForegroundColor Yellow
+Start-Sleep -Seconds 45
 
-$plan = New-AzAppServicePlan -Name "ASP-PRO-ENT" -ResourceGroupName $globalConfig.ResourceGroup -Location $globalConfig.Location -Tier "Basic" -Linux
-$webapp = New-AzWebApp -Name $globalConfig.WebAppName -ResourceGroupName $globalConfig.ResourceGroup -Location $globalConfig.Location -AppServicePlan "ASP-PRO-ENT"
-Set-AzWebApp -ResourceGroupName $globalConfig.ResourceGroup -Name $globalConfig.WebAppName -LinuxFxVersion "NODE|20-lts" -HttpsOnly $true | Out-Null
+$ctx = $storageAccount.Context
+Write-Host "     -> Configuration des services internes..." -ForegroundColor White
+New-AzStorageContainer -Name "mon-conteneur-blob" -Context $ctx -Permission Off -ErrorAction SilentlyContinue | Out-Null
+New-AzStorageShare -Name "partage-pro" -Context $ctx -ErrorAction SilentlyContinue | Out-Null
+New-AzStorageTable -Name "tablelogs" -Context $ctx -ErrorAction SilentlyContinue | Out-Null
+New-AzStorageQueue -Name "filemessages" -Context $ctx -ErrorAction SilentlyContinue | Out-Null
+Write-Host "     ✅ Services de stockage opérationnels." -ForegroundColor Green
 
 # =============================================================================
-# 7. RAPPORT FINAL
+# 7. WEB APP (PAAS)
+# =============================================================================
+Write-Host "[6/8] Finalisation Web App..." -ForegroundColor Magenta
+az appservice plan create -g $globalConfig.ResourceGroup -n "ASP-PRO-ENT" --is-linux --sku B1 --location $globalConfig.Location --output none
+az webapp create -g $globalConfig.ResourceGroup -n $globalConfig.WebAppName --plan "ASP-PRO-ENT" --runtime "NODE:20-lts" --output none
+
+# =============================================================================
+# 8. RAPPORT FINAL
 # =============================================================================
 Write-Host "`n=====================================================================" -ForegroundColor Green
 Write-Host " 🏅 ARCHITECTURE ENTREPRISE DÉPLOYÉE AVEC SUCCÈS" -ForegroundColor Green
 Write-Host "====================================================================="
 Write-Host " 🌐 LOAD BALANCER IP : http://$(az network public-ip show -g $globalConfig.ResourceGroup -n $globalConfig.LBIPName --query "ipAddress" -o tsv)"
+foreach($v in $vmInfos) { Write-Host " 🖥️ $($v.Name) IP      : $($v.IP)" }
 Write-Host " 🏦 MYSQL HOSTNAME   : $($globalConfig.DBName).mysql.database.azure.com"
-Write-Host " 🖥️ VMs DÉPLOYÉES    : $($vmInfos.Count) serveurs actifs."
 Write-Host " 🌍 WEB APP URL      : https://$($globalConfig.WebAppName).azurewebsites.net"
+Write-Host " 📦 STORAGE BLOB URL : $($storageAccount.PrimaryEndpoints.Blob)"
 Write-Host "====================================================================="
-
 ```
 
 # Partie 2 : Connexion au server pour la création de la base de données
