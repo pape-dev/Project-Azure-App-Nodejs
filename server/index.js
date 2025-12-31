@@ -141,7 +141,7 @@ app.post("/api/contact", async (req, res) => {
   }
 });
 
-app.listen(PORT, "127.0.0.1", () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Serveur API démarré sur http://localhost:${PORT}`);
 });
 
