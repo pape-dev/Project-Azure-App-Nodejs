@@ -525,19 +525,21 @@ pm2 start server/index.js --name "api-backend"
 pm2 save
   ```
 
-## Configuration de Nginx (Reverse Proxy)
+# Partie 6 : Configuration de Nginx (Reverse Proxy)
+
+## 1. Modifier la configuration de Nginx
+
+Ouvrez le fichier de configuration de votre application avec un éditeur de texte :
 
 ```
- nano /etc/nginx/sites-available/mon_app
- 
+nano /etc/nginx/sites-available/mon_app
 ```
-
-code à mettre :
+Ajoutez ensuite le code suivant dans le fichier de configuration de Nginx :
 
 ```
 server {
     listen 80;
-    server_name 4.235.106.204; # Votre IP Azure
+    server_name 4.235.106.204;  # Remplacez par votre IP Azure
 
     # Serveur de fichiers statiques (Frontend)
     location / {
@@ -558,7 +560,11 @@ server {
 }
 
 ```
-## Gestion des permissions
+## 2. Gestion des Permissions
+
+Il est nécessaire de configurer les permissions d'accès pour que Nginx puisse accéder aux fichiers de votre projet.
+
+Exécutez les commandes suivantes :
 
 ```
 # Autoriser Nginx à accéder à votre dossier utilisateur
@@ -568,39 +574,48 @@ sudo chmod +x /home/dspi
 sudo chmod -R 755 /home/dspi/dspi-tech-employee-hub
 
 ```
-## Activation
+
+## 3. Activation de la Configuration
+
+Pour activer la configuration de Nginx et redémarrer le service, suivez ces étapes :
 
 ```
+# Créer un lien symbolique pour activer la configuration
 sudo ln -s /etc/nginx/sites-available/mon_app /etc/nginx/sites-enabled/
+
+# Tester la configuration de Nginx pour vérifier s'il y a des erreurs
 sudo nginx -t
+
+# Redémarrer Nginx pour appliquer les changements
 sudo systemctl restart nginx
 
 ```
 
-## Quelques commandes utiles
+## 4. Quelques Commandes Utiles
+
+Voici une liste de commandes utiles pour gérer votre application et vérifier son statut :
 
 ```
 # Voir si le backend est "online"
 pm2 status
 
-# Redémarrer le backend
+# Redémarrer le backend (API)
 pm2 restart api-backend
 
 # Voir les logs du backend (erreurs de code ou base de données)
 pm2 logs api-backend
 
-# Sauvegarder pour le redémarrage automatique de la VM
+# Sauvegarder la configuration pour le redémarrage automatique de la VM
 pm2 save
 
 ```
 
-## Statut du pm2
+## 5. Statut de PM2
 
-- VM 1
+Voici l'état de PM2 sur chaque machine virtuelle :
 
-
-- VM 2
-
+- **VM 1** : [Détails du statut ici]
+- **VM 2** : [Détails du statut ici]
 
 
 ## Se connecter à l'application
