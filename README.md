@@ -7,6 +7,11 @@
 ![Node.js](https://img.shields.io/badge/Runtime-Node.js_20_LTS-339933?style=flat&logo=nodedotjs)
 ![Security](https://img.shields.io/badge/Security-Firewall_Active-success?style=flat)
 
+# Architecture 
+
+![Azure DSPI-TECH](Docs_Config/Architecture.png)
+
+
 
 ---
 
