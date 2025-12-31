@@ -528,7 +528,7 @@ npm run build
 ### 🚀 Lancer l'application avec PM2
 
   ```
-cd ~/dspi-tech-employee-hub
+cd + 📂 du projet
 pm2 start server/index.js --name "api-backend"
 pm2 save
   ```
@@ -547,11 +547,11 @@ Ajoutez ensuite le code suivant dans le fichier de configuration de Nginx :
 ```
 server {
     listen 80;
-    server_name 4.235.106.204;  # Remplacez par votre IP Azure
+    server_name _;  # Remplacez par votre IP Azure
 
     # Serveur de fichiers statiques (Frontend)
     location / {
-        root /home/dspi/dspi-tech-employee-hub/dist;
+        root /home/dspi_admin/Project-Azure-App-Nodejs/dist;
         index index.html;
         try_files $uri $uri/ /index.html;
     }
@@ -576,10 +576,11 @@ Exécutez les commandes suivantes :
 
 ```
 # Autoriser Nginx à accéder à votre dossier utilisateur
-sudo chmod +x /home/dspi
+sudo chmod +x /home/dspi_admin
 
 # Donner les droits de lecture sur le projet
-sudo chmod -R 755 /home/dspi/dspi-tech-employee-hub
+ sudo chmod -R 755 /home/dspi_admin/Project-Azure-App-Nodejs/
+
 
 ```
 
