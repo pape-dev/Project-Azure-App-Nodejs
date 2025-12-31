@@ -460,66 +460,70 @@ sudo chmod +x install_docker.sh
 sudo ./install_docker.sh
 ```
 
-# Partie 4 : 📦 Dépendances applicatives dans chaque VM
-```
-sudo apt update && sudo apt upgrade -y
-# Installation de Node.js (via NodeSource pour avoir une version récente)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs nginx git
-# Installation globale de PM2
-sudo npm install -g pm2
-```
+# Partie 4 : 📦 Dépendances applicatives dans chaque VM Ubuntu Server
 
-## Cloner L'application 
+La commande suivante réalise l'ensemble des actions suivantes en un seul enchaînement :
 
-### 🔐 Accès GitHub via SSH
-
-Au niveau de chaque VM : 
-
-- 1️⃣ Générer une clé SSH
+1. **Mise à jour et mise à niveau des paquets du système.**
+2. **Installation de la version 20.x de Node.js** via le script NodeSource.
+3. **Installation de Node.js, Nginx et Git.**
+4. **Installation globale de PM2** pour gérer les processus Node.js.
 
 ```
-ssh-keygen -t ed25519 -C "pape-dev"
+sudo apt update && sudo apt upgrade -y && curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs nginx git && sudo npm install -g pm2
 
 ```
 
-- 3️⃣ Copier la clé publique
+# Partie 5 : Cloner et Déployer l'Application
 
-```
-cat ~/.ssh/id_ed25519.pub
+## 🔐 Accès GitHub via HTTPS
 
-```
+### 1️⃣ Cloner le repository via HTTPS
 
-- 4️⃣ Ajouter la clé sur GitHub : GitHub → Settings → SSH and GPG keys → New SSH key - Colle la clé → Save
+Si vous n'avez pas configuré de clé SSH ou n'avez pas accès à GitHub via SSH, vous pouvez cloner le repository en utilisant HTTPS.
 
-- 5️⃣ Cloner le repo en SSH
+1. **Obtenez l'URL HTTPS du repository** :
+   - Allez sur la page du repository GitHub.
+   - Cliquez sur le bouton **Code** en haut à droite du repository.
+   - Copiez l'URL sous **Clone with HTTPS**.
 
-```
-git clone [url]
-cd + 📂 
+2. **Cloner le repository avec HTTPS** :
+   
+   Exécutez la commande suivante pour cloner le projet :
 
-```
-### Lancement avec PM2
+   ```
+    git clone [url]
+    cd [nom-du-dossier]
+   ```
+2. Authentification avec GitHub
 
-```
+Lors du clonage via HTTPS, vous serez invité à entrer vos identifiants GitHub :
+
+- **Nom d'utilisateur** : Votre nom d'utilisateur GitHub.
+- **Mot de passe** : Utilisez un **token d'accès personnel (PAT)** comme mot de passe.  
+  Si vous n'avez pas encore généré de PAT, suivez [ces instructions](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token).
+
+### 📦 Installer les dépendances
+
+Avant de pouvoir exécuter l'application, vous devez installer les dépendances nécessaires. Exécutez la commande suivante dans le répertoire du projet cloné :
+
+  ```
+npm install
+  ```
+
+### ⚙️ Build du projet
+
+  ```
+npm run build
+  ```
+
+### 🚀 Lancer l'application avec PM2
+
+  ```
 cd ~/dspi-tech-employee-hub
 pm2 start server/index.js --name "api-backend"
-pm2 save 
-
-```
-
-## Installer les dépendances
-
-```
-npm install
-
-```
-## Build du projet
-
-```
-npm run build
-
-```
+pm2 save
+  ```
 
 ## Configuration de Nginx (Reverse Proxy)
 
