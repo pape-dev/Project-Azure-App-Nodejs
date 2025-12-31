@@ -9,7 +9,7 @@
 
 # Architecture 
 
-![Azure DSPI-TECH](Docs_Config/Architecture.png)
+![Azure DSPI-TECH](Docs_Config/archi.png)
 
 
 
