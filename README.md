@@ -544,7 +544,7 @@ Ajoutez ensuite le code suivant dans le fichier de configuration de Nginx :
 ```
 server {
     listen 80;
-    server_name 4.219.12.45;  # Remplacez par votre IP Azure ou nom de domaine (ex. example.com)
+    server_name 4.888.12.45;  # Remplacez par votre IP Azure ou nom de domaine (ex. example.com)
 
     # Serveur de fichiers statiques (Frontend)
     location / {
@@ -635,6 +635,80 @@ pm2 save
 # Partie 5 : Configuration du load balancer
 
 Dans cette partie on souhaite accéder à l'pplication via l'IP publique du Load Balancer.
+
+## Modification du fichier `index.tsx` pour chaque VM
+
+Dans le dossier du projet, ouvrez :
+
+```
+src/pages/index.tsx
+```
+
+Repérez la section suivante :
+
+```
+<section className="relative py-20 lg:py-32 overflow-hidden">
+  <div className="container mx-auto px-4">
+    <div className="max-w-4xl mx-auto text-center">
+      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8 animate-fade-in">
+        <Building2 className="w-4 h-4" />
+        VM-UBUNTU-01 Azure
+      </div>
+      
+      <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 animate-slide-up">
+        Bienvenue chez{" "}
+        <span className="gradient-text">DSPI-TECH</span>
+      </h1>
+      
+      <p className="text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto animate-slide-up" style={{ animationDelay: "0.1s" }}>
+        Gérez efficacement vos ressources humaines avec notre plateforme intuitive et performante. 
+        L'excellence technologique au service de vos équipes.
+      </p>
+      
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up" style={{ animationDelay: "0.2s" }}>
+        <Button asChild variant="glow" size="xl">
+          <Link to="/salaries">
+            Voir les salariés
+            <ArrowRight className="w-5 h-5" />
+          </Link>
+        </Button>
+        <Button asChild variant="outline" size="xl">
+          <Link to="/nouveau">
+            Ajouter un employé
+          </Link>
+        </Button>
+      </div>
+    </div>
+  </div>
+
+  {/* Decorative element */}
+  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] pointer-events-none">
+    <div className="absolute inset-0 bg-primary/5 rounded-full blur-3xl animate-pulse-glow" />
+  </div>
+</section>
+
+```
+
+## Instructions pour chaque VM
+
+### VM 1
+Modifiez le texte comme suit :
+
+```
+VM-UBUNTU-01 Azure
+
+```
+
+### VM 2
+
+Modifiez le texte comme suit :
+
+```
+VM-UBUNTU-02 Azure
+
+```
+
+Cela permet de distinguer visuellement quelle VM affiche le frontend dans l’application.
 
 
 ## 1. Mettre à jour la configuration de Nginx
