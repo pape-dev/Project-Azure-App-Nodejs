@@ -88,13 +88,7 @@ Le script est divisé en plusieurs étapes pour déployer les différentes resso
 - Le nombre de VMs déployées.
 - L'URL de l'application web déployée.
 
-## Exécution du Script
-
-1. Clonez ce repository sur votre machine locale.
-2. Ouvrez PowerShell et naviguez jusqu'au répertoire contenant le script.
-3. Exécutez le script avec la commande suivante :
-
-## Voici le script : 
+## **Exécution du Script** 
 ```
 
 # =============================================================================
